@@ -5,108 +5,59 @@ const db = admin.firestore();
 const bcryptjs = require('bcryptjs');
 
 // Create product
-router.post("/api/products", async (req, res) => {
+router.post("/create/product", async (req, res) => {
   try {
+    const { name, cantidad, precio } = req.body;
+
+    if (!name || !cantidad || !precio) {
+      return res.status(400).json({ error: 'Debes proporcionar nombre, cantidad y precio.' });
+    }
+
     await db
       .collection("products")
       .doc()
-      .create({ name: req.body.name });
-    return res.status(200).json();
+      .create({ name, cantidad, precio });
+
+    return res.status(200).json({ message: 'Producto creado exitosamente.' });
   } catch (error) {
+    console.error('Error al crear el producto:', error);
     return res.status(500).send(error);
   }
 });
+//get the characteristics of a specific product
+router.get("/products/:product_id", async (req, res) => {
+  try {
+    const doc = db.collection("products").doc(req.params.product_id);
+    const item = await doc.get();
 
-router.get("/api/products/:product_id", (req, res) => {
-  (async () => {
-    try {
-      const doc = db.collection("products").doc(req.params.product_id);
-      const item = await doc.get();
-      const response = item.data().name;
-      return res.status(200).send(response);
-    } catch (error) {
-      return res.status(500).send(error);
+    if (!item.exists) {
+      return res.status(404).json({ error: 'Producto no encontrado.' });
     }
-  })();
-});
 
-router.get("/api/products", async (req, res) => {
+    const data = item.data();
+    const response = {
+      name: data.name,
+      cantidad: data.cantidad,
+      precio: data.precio
+    };
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error('Error al obtener el producto:', error);
+    return res.status(500).send(error);
+  }
+});
+//get product list
+router.get("/products", async (req, res) => {
   try {
     let query = db.collection("products");
     const querySnapshot = await query.get();
     let docs = querySnapshot.docs;
 
     const response = docs.map((doc) => ({
-      id: doc.id,
       name: doc.data().name,
       cantidad: doc.data().cantidad,
       precio: doc.data().precio
-    }));
-
-    return res.status(200).json(response[1]);
-  } catch (error) {
-    return res.status(500).json(error);
-  }
-});
-
-router.put("/api/products/:product_id", async (req, res) => {
-  try {
-    const document = db.collection("products").doc(req.params.product_id);
-    await document.update({
-      name: req.body.name,
-    });
-    return res.status(200).json();
-  } catch (error) {
-    return res.status(500).json();
-  }
-});
-
-router.delete("/api/products/:product_id", async (req, res) => {
-  try {
-    const doc = db.collection("products").doc(req.params.product_id);
-    await doc.delete();
-    return res.status(200).json();
-  } catch (error) {
-    return res.status(500).send(error);
-  }
-});
-
-// Create user
-router.post("/api/users", async (req, res) => {
-  try {
-    await db
-      .collection("users")
-      .doc("/" + req.body.id + "/")
-      .create({ name: req.body.name });
-    return res.status(200).json();
-  } catch (error) {
-    return res.status(500).send(error);
-  }
-});
-
-router.get("/api/users/:users_id", (req, res) => {
-  (async () => {
-    try {
-      const doc = db.collection("users").doc(req.params.users_id);
-      const item = await doc.get();
-      const response = item.data();
-      return res.status(200).send(response);
-    } catch (error) {
-      return res.status(500).send(error);
-    }
-  })();
-});
-
-router.get("/api/users", async (req, res) => {
-  try {
-    let query = db.collection("users");
-    const querySnapshot = await query.get();
-    let docs = querySnapshot.docs;
-
-    const response = docs.map((doc) => ({
-      id: doc.id,
-      name: doc.data().name,
-      email: doc.data().cantidad
     }));
 
     return res.status(200).json(response);
@@ -114,57 +65,80 @@ router.get("/api/users", async (req, res) => {
     return res.status(500).json(error);
   }
 });
-
-router.put("/api/users/:users_id", async (req, res) => {
+//Update product features
+router.put("/products/:product_id", async (req, res) => {
   try {
-    const document = db.collection("users").doc(req.params.users_id);
-    await document.update({
-      name: req.body.name,
-    });
+    const document = db.collection("products").doc(req.params.product_id);
+    const updateData = {};
+
+    if (req.body.name) {
+      updateData.name = req.body.name;
+    }
+
+    if (req.body.cantidad) {
+      updateData.cantidad = req.body.cantidad;
+    }
+
+    if (req.body.precio) {
+      updateData.precio = req.body.precio;
+    }
+
+    await document.update(updateData);
+
     return res.status(200).json();
   } catch (error) {
     return res.status(500).json();
   }
 });
-
-router.delete("/api/users/:users_id", async (req, res) => {
+//delete product
+router.delete("/products/delete/:product_id", async (req, res) => {
   try {
-    const doc = db.collection("users").doc(req.params.users_id);
+    const doc = db.collection("products").doc(req.params.product_id);
     await doc.delete();
-    return res.status(200).json();
+    return res.status(200).json('Product was deleted successfully');
   } catch (error) {
     return res.status(500).send(error);
   }
 });
-//Creación usuario administrador
+///////////////////////////////////////////////////////////////////////////////////////
+//Create admin user
 router.post("/create/admin", async (req, res) => {
-  
-  const password = req.body.password;
-
   try {
-    let passwordHash = await bcryptjs.hash(password,8);
+    const { user, password, email } = req.body; 
+
+    if (!user || !password || !email) {
+      return res.status(400).json('Se requieren el nombre de usuario, la contraseña y el correo electrónico.');
+    }
+
+    let passwordHash = await bcryptjs.hash(password, 8);
+
     await db
       .collection("admin")
-      .doc(req.body.user)
-      .create({user: req.body.user, password: passwordHash});
-    return res.status(200).json();
+      .doc(user)
+      .create({ user, password: passwordHash, email });
+
+    return res.status(200).json('Admin User was created');
   } catch (error) {
     return res.status(500).send(error);
   }
 });
-
-//Autenticación de usuario administrador
+//admin user authentication
 router.post("/login/admin", async (req, res) => {
-  const userIn = req.body.user;
-  const passwordIn = req.body.password;
-  const docRef = db.collection("admin").doc(userIn);
+  const { user, password } = req.body; // Desestructura el objeto req.body
+
+  if (!user || !password) {
+    return res.status(400).json('Se requieren tanto el nombre de usuario como la contraseña.');
+  }
+
+  const docRef = db.collection("admin").doc(user);
 
   try {
     const doc = await docRef.get();
 
     if (doc.exists) {
-      const password = doc.data().password;
-      let compare = bcryptjs.compareSync(passwordIn, password);
+      const storedPassword = doc.data().password;
+      const compare = bcryptjs.compareSync(password, storedPassword);
+
       if (compare) {
         return res.status(200).json("¡AUTENTICACIÓN EXITOSA!");
       } else {
@@ -178,36 +152,120 @@ router.post("/login/admin", async (req, res) => {
     return res.status(500).json(error);
   }
 });
-
-//Creación usuario cliente
-router.post("/create/users", async (req, res) => {
-  
-  const password = req.body.password;
-
+//get admin users
+router.get("/users/admin", async (req, res) => {
   try {
-    let passwordHash = await bcryptjs.hash(password,8);
-    await db
-      .collection("users")
-      .doc(req.body.user)
-      .create({user: req.body.user, password: passwordHash});
-    return res.status(200).json();
+    let query = db.collection("admin");
+    const querySnapshot = await query.get();
+    let docs = querySnapshot.docs;
+
+    const response = docs.map((doc) => ({
+      user: doc.data().user,
+      email: doc.data().email
+    }));
+
+    return res.status(200).json(response);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
+//Update admin users
+router.put("/users/admin/:users_id", async (req, res) => {
+  try {
+    const users_id = req.params.users_id;
+    const { user, password, email } = req.body;
+
+    const document = db.collection("admin").doc(users_id);
+    const name = await document.get();
+
+    if (!name.exists) {
+      return res.status(404).json('Usuario no encontrado');
+    }
+
+    let updatedFields = {};
+
+    if (user) {
+      updatedFields.user = user;
+    }
+
+    if (password) {
+      const passwordHash = await bcryptjs.hash(password, 8);
+      updatedFields.password = passwordHash;
+    }
+
+    if (email) {
+      updatedFields.email = email;
+    }
+
+    await document.update(updatedFields);
+
+    return res.status(200).json('Usuario administrador actualizado correctamente');
   } catch (error) {
     return res.status(500).send(error);
   }
 });
+//delete admin user
+router.delete("/users/admin/delete/:users_id", async (req, res) => {
+  try {
+    const users_id = req.params.users_id;
 
-//Autenticación de usuario cliente
+    if (!users_id) {
+      return res.status(400).json('Se requiere el ID del usuario administrador.');
+    }
+
+    const document = db.collection("admin").doc(users_id);
+    const user = await document.get();
+
+    if (!user.exists) {
+      return res.status(404).json('Usuario administrador no encontrado');
+    }
+
+    await document.delete();
+
+    return res.status(200).json('Usuario administrador eliminado correctamente');
+  } catch (error) {
+    console.error("Error al eliminar el usuario administrador:", error);
+    return res.status(500).json(error);
+  }
+});
+//Create customer user
+router.post("/create/users", async (req, res) => {
+  try {
+    const { user, password, email } = req.body; 
+
+    if (!user || !password || !email) {
+      return res.status(400).json('Se requieren el nombre de usuario, la contraseña y el correo electrónico.');
+    }
+
+    let passwordHash = await bcryptjs.hash(password, 8);
+
+    await db
+      .collection("users")
+      .doc(user)
+      .create({ user, password: passwordHash, email });
+
+    return res.status(200).json('Customer User was created');
+  } catch (error) {
+    return res.status(500).send(error);
+  }
+});
+//Customer user authentication
 router.post("/login/users", async (req, res) => {
-  const userIn = req.body.user;
-  const passwordIn = req.body.password;
-  const docRef = db.collection("users").doc(userIn);
+  const { user, password } = req.body; 
+
+  if (!user || !password) {
+    return res.status(400).json('Se requieren tanto el nombre de usuario como la contraseña.');
+  }
+
+  const docRef = db.collection("users").doc(user);
 
   try {
     const doc = await docRef.get();
 
     if (doc.exists) {
-      const password = doc.data().password;
-      let compare = bcryptjs.compareSync(passwordIn, password);
+      const storedPassword = doc.data().password;
+      const compare = bcryptjs.compareSync(password, storedPassword);
+
       if (compare) {
         return res.status(200).json("¡AUTENTICACIÓN EXITOSA!");
       } else {
@@ -218,6 +276,82 @@ router.post("/login/users", async (req, res) => {
     }
   } catch (error) {
     console.error("Error al verificar el documento:", error);
+    return res.status(500).json(error);
+  }
+});
+//get customer users
+router.get("/users", async (req, res) => {
+  try {
+    let query = db.collection("users");
+    const querySnapshot = await query.get();
+    let docs = querySnapshot.docs;
+
+    const response = docs.map((doc) => ({
+      user: doc.data().user,
+      email: doc.data().email
+    }));
+
+    return res.status(200).json(response);
+  } catch (error) {
+    return res.status(500).json(error);
+  }
+});
+//Update customer user
+router.put("/users/:users_id", async (req, res) => {
+  try {
+    const users_id = req.params.users_id;
+    const { user, password, email } = req.body;
+
+    const document = db.collection("users").doc(users_id);
+    const name = await document.get();
+
+    if (!name.exists) {
+      return res.status(404).json('Usuario no encontrado');
+    }
+
+    let updatedFields = {};
+
+    if (user) {
+      updatedFields.user = user;
+    }
+
+    if (password) {
+      const passwordHash = await bcryptjs.hash(password, 8);
+      updatedFields.password = passwordHash;
+    }
+
+    if (email) {
+      updatedFields.email = email;
+    }
+
+    await document.update(updatedFields);
+
+    return res.status(200).json('Usuario administrador actualizado correctamente');
+  } catch (error) {
+    return res.status(500).send(error);
+  }
+});
+//delete customer user
+router.delete("/users/delete/:users_id", async (req, res) => {
+  try {
+    const users_id = req.params.users_id;
+
+    if (!users_id) {
+      return res.status(400).json('Se requiere el ID del usuario administrador.');
+    }
+
+    const document = db.collection("users").doc(users_id);
+    const user = await document.get();
+
+    if (!user.exists) {
+      return res.status(404).json('Usuario no encontrado');
+    }
+
+    await document.delete();
+
+    return res.status(200).json('Usuario eliminado correctamente');
+  } catch (error) {
+    console.error("Error al eliminar el usuario administrador:", error);
     return res.status(500).json(error);
   }
 });

@@ -1,12 +1,13 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const app = express();
-const bcryptjs = require('bcryptjs');
+const functions = require('firebase-functions');
+app.use(express.json());
 
 admin.initializeApp({
     credential: admin.credential.cert('./permissions.json'),
-    databaseURL: "https://fb-api-9406c.firebaseio.com"
-})
+    databaseURL: "https://proyectotelematica-921fe.firebaseio.com"
+});
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
@@ -18,3 +19,4 @@ app.get('/hello-word', (req, res) => {
 });
 
 app.use(require('./routes/products.routes'))
+exports.app = functions.https.onRequest(app);
